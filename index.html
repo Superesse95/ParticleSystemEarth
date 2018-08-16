@@ -1,0 +1,345 @@
+<html>
+	<head>
+		<meta charset="UTF-8">        
+		<title>Earth | Simone Undri Innocenti</title>
+		<link rel="stylesheet" type="text/css" href="css/style.css">
+	</head>
+	
+	<div class="selector" id="statsDiv">
+        <hr>
+		<h4 id="cameraPos">Camera Position:</h4>
+        <hr>
+        <h4 id="particlesSun">Particles per Sun: </h4>
+        <h4 id="particlesStars">Particles per Sun: </h4>
+        <hr>
+    
+        <div style = "text-align: center">
+            <button onclick="hidePlane()"> Plane </button>
+            <button onclick="hideAxis()"> Axis </button>
+            <button id = "EarthOrbit" onclick="hideEarthOrbit()"> Earth's Orbit </button>
+            <button onclick="hideMoonOrbit()"> Moon's Orbit </button>
+            <button onclick="window.location.reload()"> Reset </button>
+            <div id = "checkDevice">
+            <hr>
+            <h4>Press "f" to get or remove full screen!</h4>
+            <h4>Press "TAB" for moving or stopping objects!</h4>
+            <hr>
+            </div>
+                
+            <button id = "ObsEarth" onclick="exploreEarth()"> Look From The Earth </button>
+            
+            <button id = "ObsSun" style = "display: none" onclick="exploreSun()"> Look From The Sun </button>
+        </div>
+        
+        <hr>
+   
+	</div>
+    
+	<body id="body" onload="init()">
+		
+        
+        <script type="x-shader/x-vertex" id="vertex_sun">
+            attribute float radius;
+            attribute float longAngle;
+            attribute float latAngle;
+            attribute vec3 customColor;
+
+            uniform float delta;
+            uniform float revolution_angle; //Useful to allow change point of view
+            uniform float enabling;
+
+            varying vec4 vColor;
+
+            void main() {
+                //Start setting data to change point of view
+                float tx = enabling*(1500.0)*cos(revolution_angle);
+                float tz = enabling*(1000.0)*sin(revolution_angle);
+                float ty = enabling*(40.0)*cos(revolution_angle);
+                //End setting data to change point of view
+                vec3 p = position;
+                p.z = radius*cos(longAngle + delta)*cos(latAngle + delta) - tz;
+                p.x = radius*sin(longAngle + delta)*cos(latAngle + delta) - tx;
+                p.y = radius*sin(latAngle + delta) - ty;
+                vColor = vec4(customColor, 1.0);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);                
+                gl_PointSize = 1.0; 
+            }
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragment_sun">
+            varying vec4 vColor;
+            void main() {
+                gl_FragColor = vColor;
+            }
+        </script>
+        
+        <script type="x-shader/x-vertex" id="vertex_base_sun">
+            uniform sampler2D texture;
+            uniform float revolution_angle; //Useful to allow change point of view
+            uniform float enabling;
+            
+            varying vec2 vUv;
+
+            void main() {
+                vUv = uv;
+                //Start setting data to change point of view
+                float tx = enabling*(1500.0)*cos(revolution_angle);
+                float tz = enabling*(1000.0)*sin(revolution_angle);
+                float ty = enabling*(40.0)*cos(revolution_angle);
+                //End setting data to change point of view
+                vec3 p = position;
+                p.z -= tz;
+                p.x -= tx;
+                p.y -= ty;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+            }
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragment_base_sun">
+            uniform sampler2D texture;
+
+            varying vec2 vUv;
+
+            void main() {
+                vec4 color = texture2D( texture,  vUv.xy );
+                color.a = 1.0;
+                gl_FragColor = color;
+            }
+        </script>
+        
+        <script type="x-shader/x-vertex" id="vertex_star">
+            attribute float size;
+            
+            uniform sampler2D texture;
+
+            varying vec2 vUv;
+
+            void main() {
+                vUv = uv;
+                vec3 p = position;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+                gl_PointSize = size;       
+            }
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragment_star">
+            uniform sampler2D texture;
+
+            varying vec2 vUv;
+
+            void main() {
+                vec4 color = texture2D( texture,  vUv.xy );
+                color.a = 1.0;
+                gl_FragColor = color;
+            }
+        </script>
+        
+        <script type="x-shader/x-vertex" id="vertex_earth">
+            uniform float rotation_angle;
+            uniform float revolution_angle;
+            uniform sampler2D texture;
+            uniform float enabling;
+            
+            varying vec3 info;
+            varying float r;
+            varying vec2 vUv;
+            
+            vec3 rotate(vec3 pos, float a) {
+                float s = sin(a);
+                float c = cos(a);
+                mat3 m = mat3(c,0,s,0,1,0,-s,0,c);
+                return m*pos;
+            }
+            
+            void main() 
+            {	
+                vUv = uv;
+                vec3 p = rotate(position, rotation_angle);
+                p.x += enabling*(600.0)*cos(revolution_angle);
+                p.z += enabling*(400.0)*sin(revolution_angle);
+                p.y += enabling*(40.0)*cos(revolution_angle);
+                info = p;
+                r = sqrt((600.0)*cos(revolution_angle)*(600.0)*cos(revolution_angle) + (400.0)*sin(revolution_angle)*(400.0)*sin(revolution_angle));
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+            }
+		</script>
+        
+		<script type="x-shader/x-fragment" id="fragment_earth">
+            uniform sampler2D texture;
+            
+            uniform float revolution_angle;
+            uniform float enabling;
+
+            varying vec3 info;
+            varying float r;
+            varying vec2 vUv;
+            
+            void main() {
+                vec4 baseColor = texture2D( texture, vUv.xy );
+                vec4 theColor = baseColor;
+                theColor.a = 1.0;
+                if(enabling == 1.0){
+                float distance = sqrt(info.x*info.x + info.z*info.z);
+                    if(distance > r) {
+                        theColor.x -= 0.4*r/(distance);
+                        theColor.y -= 0.4*r/(distance);
+                        theColor.z -= 0.4*r/(distance);
+                    }    
+                } 
+                else if(enabling == 0.0) {
+                    float xs = (-1500.0)*cos(revolution_angle);
+                    float zs = (-1000.0)*sin(revolution_angle);
+                    float r = sqrt(xs*xs + zs*zs);
+                    float distance = sqrt((xs-info.x)*(xs-info.x) + (zs-info.z)*(zs-info.z));
+                    if(distance > r) {
+                        theColor.x -= 0.4*r/(distance);
+                        theColor.y -= 0.4*r/(distance);
+                        theColor.z -= 0.4*r/(distance);
+                    }
+                }
+                gl_FragColor = theColor;
+            }
+		</script>
+		
+        <script type="x-shader/x-vertex" id="vertex_moon">
+            uniform float revolution_angle;
+            uniform float motion_angle;
+            uniform sampler2D texture;
+            uniform float enabling;
+            
+            varying vec3 info;
+            varying float r;
+            varying vec2 vUv;
+            
+            void main() 
+            {	
+                vUv = uv;
+                vec3 p = position;
+                float offset_x = enabling*(600.0)*cos(revolution_angle) + (160.0)*cos(motion_angle);
+                float offset_z = enabling*(400.0)*sin(revolution_angle) + (120.0)*sin(motion_angle);
+                p.x += offset_x;
+                p.z += offset_z;
+                p.y += enabling*(40.0)*cos(revolution_angle) + 60.0*cos(motion_angle);
+                info = p;
+                r = sqrt(offset_x*offset_x + offset_z*offset_z);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+            }
+		</script>
+        
+        <script type="x-shader/x-fragment" id="fragment_moon">
+            uniform sampler2D texture;
+            
+            uniform float revolution_angle;
+            uniform float enabling;
+            uniform float motion_angle;
+            
+            varying vec3 info;
+            varying float r;
+            
+            varying vec2 vUv;
+
+            void main() {
+                vec4 baseColor = texture2D( texture, vUv.xy );
+                vec4 theColor = baseColor ;
+                theColor.a = 1.0;
+                
+                if(enabling == 1.0) {
+                    float distance = sqrt(info.x*info.x + info.z*info.z);
+                    if(distance > r){
+                        theColor.x -= 0.5*r/(distance);
+                        theColor.y -= 0.5*r/(distance);
+                        theColor.z -= 0.5*r/(distance);
+                    }
+                }
+                else if(enabling == 0.0) {
+                    float xs = (-1500.0)*cos(revolution_angle);
+                    float zs = (-1000.0)*sin(revolution_angle);
+                    float xl = (160.0)*cos(motion_angle);
+                    float zl = (120.0)*sin(motion_angle);
+                    float r = sqrt((xs-xl)*(xs-xl) + (zs-zl)*(zs-zl));
+                    float distance = sqrt((xs-info.x)*(xs-info.x) + (zs-info.z)*(zs-info.z));
+                    if(distance > r) {
+                        theColor.x -= 0.5*r/(distance);
+                        theColor.y -= 0.5*r/(distance);
+                        theColor.z -= 0.5*r/(distance);
+                    }
+                }
+                
+                gl_FragColor = theColor;
+            }
+		</script>
+        
+        <script type="x-shader/x-vertex" id="vertex_earthOrbit">
+            attribute float angle;
+            
+            uniform vec3 customColor;
+            uniform float enabling;
+            
+            varying vec4 vColor;
+            
+            void main() 
+            {	
+                vec3 p = position;
+                p.x += enabling*(600.0)*cos(angle);
+                p.z += enabling*(400.0)*sin(angle);
+                p.y += enabling*(40.0)*cos(angle);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+                vColor = vec4(customColor, 1.0);
+                gl_PointSize = 1.0; 
+            }
+		</script>
+        
+		<script type="x-shader/x-fragment" id="fragment_earthOrbit">
+            varying vec4 vColor;
+            
+            void main() {
+                gl_FragColor = vec4(1.0, 1.0, 0.0, 0.9);
+            }
+		</script>
+        
+        <script type="x-shader/x-vertex" id="vertex_moonOrbit">
+            attribute float angle;
+            
+            uniform vec3 customColor;
+            uniform float revolution_angle;
+            uniform float enabling;
+            
+            varying vec4 vColor;
+            
+            void main() 
+            {	
+                float offset_x = enabling*(600.0)*cos(revolution_angle) + (160.0)*cos(angle);
+                float offset_z = enabling*(400.0)*sin(revolution_angle) + (120.0)*sin(angle);
+                vec3 p = position;
+                
+                p.x += offset_x;
+                p.z += offset_z;
+                p.y += enabling*(40.0)*cos(revolution_angle) + 60.0*cos(angle);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+                vColor = vec4(customColor, 1.0);
+                gl_PointSize = 1.0; 
+            }
+		</script>
+        
+		<script type="x-shader/x-fragment" id="fragment_moonOrbit">
+            varying vec4 vColor;
+            
+            void main() {
+                gl_FragColor = vec4(0.2, 0.7, 0.5, 0.9);
+            }
+		</script>
+        
+        <!--<script src="js/libs/three.js"></script>-->
+        <script src="js/libs/three.min.js"></script>
+        <script src="js/libs/mobile.js"></script>
+        <script src="js/libs/stats.min.js"></script>
+        <script src="js/libs/DAT.GUI.min.js"></script>
+        <script src="js/libs/THREEx.FullScreen.js"></script>
+        <script src="js/libs/THREEx.KeyboardState.js"></script>
+        <script src="js/libs/THREEx.WindowResize.js"></script>
+        <script src="js/libs/OrbitControls.js"></script>
+		<script src="js/infos.js"></script>
+		<script src="js/functions.js"></script>
+		<script src="js/main.js"></script>
+	</body>
+</html>
